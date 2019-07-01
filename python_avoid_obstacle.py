@@ -65,9 +65,7 @@ for x in range(1, 16 + 1):
         errorCode, detectionState, detectedPoint, detectedObjectHandle, detectedSurfaceNormalVector = vrep.simxReadProximitySensor(clientID, sensor_handle, vrep.simx_opmode_streaming)                
         sensor_val = np.append(sensor_val, np.linalg.norm(detectedPoint)) #get list of values
         
-
 t = time.time()
-
 
 while (time.time() - t) < 600:
     #Loop Execution
@@ -79,7 +77,8 @@ while (time.time() - t) < 600:
     result, detectionState, auxPackets = vrep.simxReadVisionSensor(clientID, visionSensorHandle, vrep.simx_opmode_buffer)
 
     if auxPackets:
-        steerValueauxPacketsToSteer(auxPackets)
+        steerValue = auxPacketsToSteer(auxPackets)
+        print("STEER VALUE = ", steerValue)
 
     #controller specific
     sensor_sq = sensor_val[0:8] * sensor_val[0:8] #square the values of front-facing sensors 1-8
@@ -92,21 +91,21 @@ while (time.time() - t) < 600:
     # print("sensor_sq[max_ind] = ", sensor_sq[max_ind])
     if sensor_sq[max_ind] > 0.8:
         steer = -1 / sensor_loc[max_ind]
-        v = 0
-    else:
+        forwardVelocity = 0 # set forward velocity to 0 so it rotates in place
+    else: # set steer 
         steer = 0
-        v = 1
-            
-    
-    # v = 1	#forward velocity
-    kp = 0.5	#steering gain
-    vl = v + kp * steer
-    vr = v - kp * steer
-    print("V_l =", vl)
-    print("V_r =", vr)
+        forwardVelocity = 1 
+        
+    print("SENSOR_LOC = ", sensor_loc[max_ind])
+    print("OBJ AVOID STEER = ", steer)
+    steeringGain = 0.5	#steering gain
+    leftMotorVelocity = forwardVelocity + steeringGain * steer
+    rightMotorVelocity = forwardVelocity - steeringGain * steer
+    print("V_l =", leftMotorVelocity)
+    print("V_r =", rightMotorVelocity)
 
-    errorCode = vrep.simxSetJointTargetVelocity(clientID, left_motor_handle, vl, vrep.simx_opmode_streaming)
-    errorCode = vrep.simxSetJointTargetVelocity(clientID, right_motor_handle, vr, vrep.simx_opmode_streaming) 
+    errorCode = vrep.simxSetJointTargetVelocity(clientID, left_motor_handle, leftMotorVelocity, vrep.simx_opmode_streaming)
+    errorCode = vrep.simxSetJointTargetVelocity(clientID, right_motor_handle, rightMotorVelocity, vrep.simx_opmode_streaming) 
 
     # pixelRed = image[b * (Y)]
     print("------------------------------------------------------------------")
