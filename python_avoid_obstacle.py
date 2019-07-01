@@ -22,16 +22,31 @@ clientID = vrep.simxStart('127.0.0.1', 19999, True, True, 5000, 5)
 
 # params: auxillaryPackets from simxReadVisionSensor function
 # returns: steer amount
-def auxPacketsToSteer(auxPackets):
+def visionSensorAuxPacketsToSteer(auxPackets):
     blobCount = auxPackets[1][0]
-    print("blob count", blobCount)
     # If we have more than 0 blobs then use that data
     # If more than 2 blobs detected, throw out reading because it probably contains noise
     if blobCount > 0 and blobCount < 3:
         xtarget = auxPackets[1][5]
+        print("x: ", xtarget)
+        if xtarget > 0.6:
+            return 1*(0.5-xtarget)
+        elif xtarget < 0.4:
+            return -1*(0.5-xtarget)
+        else:
+            return 0
+        
+
+# params: auxillaryPackets from simxReadVisionSensor function
+# returns: velocity multiplier
+def visionSensorAuxPacketsToVelocity(auxPackets):
+    blobCount = auxPackets[1][0]
+    # If we have more than 0 blobs then use that data
+    # If more than 2 blobs detected, throw out reading because it probably contains noise
+    if blobCount > 0 and blobCount < 3:
         ytarget = auxPackets[1][6]
-        print("x: ", xtarget, ", y: ", ytarget)
-        return 1*(0.5-xtarget)
+        print("y: ", ytarget)
+        return 1*(0.5-ytarget)
         
 
 if clientID != -1:  #check if client connection successful
@@ -47,10 +62,13 @@ errorCode, left_motor_handle = vrep.simxGetObjectHandle(clientID, 'Pioneer_p3dx_
 errorCode, right_motor_handle = vrep.simxGetObjectHandle(clientID, 'Pioneer_p3dx_rightMotor', vrep.simx_opmode_oneshot_wait)
 
 # Get visionSensorHandle
-res1, visionSensorHandle = vrep.simxGetObjectHandle(clientID, 'cam1', vrep.simx_opmode_oneshot_wait)
+visionSensorHandleReturnCode, visionSensorHandle = vrep.simxGetObjectHandle(clientID, 'cam1', vrep.simx_opmode_oneshot_wait)
 
-# Setup and 
-result, detectionState, auxPackets = vrep.simxReadVisionSensor(clientID, visionSensorHandle, vrep.simx_opmode_streaming)
+pioneerHandleReturnCode, pioneerHandle = vrep.simxGetObjectHandle(clientID, 'Pioneer_p3dx', vrep.simx_opmode_oneshot_wait)
+
+# Setup visionSensorValues
+visionSensorReturnCode, visionSensorDetectionState, visionSensorAuxPackets = vrep.simxReadVisionSensor(clientID, visionSensorHandle, vrep.simx_opmode_streaming)
+pioneerVelocityReturnCode, pioneerVelocityLinearVelocity, pioneerVelocityAngularVelocity = vrep.simxGetObjectVelocity(clientID, pioneerHandle, vrep.simx_opmode_streaming)
 
 sensor_h = [] #empty list for handles
 sensor_val = np.array([]) #empty array for sensor measurements
@@ -74,11 +92,15 @@ while (time.time() - t) < 600:
         errorCode, detectionState, detectedPoint, detectedObjectHandle, detectedSurfaceNormalVector = vrep.simxReadProximitySensor(clientID, sensor_h[x - 1],vrep.simx_opmode_buffer)                
         sensor_val = np.append(sensor_val,np.linalg.norm(detectedPoint)) #get list of values
 
-    result, detectionState, auxPackets = vrep.simxReadVisionSensor(clientID, visionSensorHandle, vrep.simx_opmode_buffer)
+    visionSensorReturnCode, visionSensorDetectionState, visionSensorAuxPackets = vrep.simxReadVisionSensor(clientID, visionSensorHandle, vrep.simx_opmode_buffer)
+    pioneerVelocityReturnCode, pioneerVelocityLinearVelocity, pioneerVelocityAngularVelocity = vrep.simxGetObjectVelocity(clientID, pioneerHandle, vrep.simx_opmode_buffer)
 
-    if auxPackets:
-        steerValue = auxPacketsToSteer(auxPackets)
+    print("P3DX Velocity = ", pioneerVelocityLinearVelocity)
+    if visionSensorAuxPackets:
+        steerValue = visionSensorAuxPacketsToSteer(visionSensorAuxPackets)
+        velocityAmount = visionSensorAuxPacketsToVelocity(visionSensorAuxPackets)
         print("STEER VALUE = ", steerValue)
+        print("VELOCITY AMOUNT VALUE = ", velocityAmount)
 
     #controller specific
     sensor_sq = sensor_val[0:8] * sensor_val[0:8] #square the values of front-facing sensors 1-8
@@ -90,11 +112,12 @@ while (time.time() - t) < 600:
     # print("SENSOR VALUES = ", sensor_val)
     # print("sensor_sq[max_ind] = ", sensor_sq[max_ind])
     if sensor_sq[max_ind] > 0.8:
+        print("-----TURNING-----")
         steer = -1 / sensor_loc[max_ind]
         forwardVelocity = 0 # set forward velocity to 0 so it rotates in place
-    else: # set steer 
-        steer = 0
-        forwardVelocity = 1 
+    else:
+        steer = (steerValue if steerValue else 0)
+        forwardVelocity = (velocityAmount if velocityAmount else 1)
         
     print("SENSOR_LOC = ", sensor_loc[max_ind])
     print("OBJ AVOID STEER = ", steer)
