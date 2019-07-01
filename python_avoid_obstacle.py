@@ -95,7 +95,7 @@ while (time.time() - t) < 600:
     visionSensorReturnCode, visionSensorDetectionState, visionSensorAuxPackets = vrep.simxReadVisionSensor(clientID, visionSensorHandle, vrep.simx_opmode_buffer)
     pioneerVelocityReturnCode, pioneerVelocityLinearVelocity, pioneerVelocityAngularVelocity = vrep.simxGetObjectVelocity(clientID, pioneerHandle, vrep.simx_opmode_buffer)
 
-    print("P3DX Velocity = ", pioneerVelocityLinearVelocity)
+    # print("P3DX Velocity = ", pioneerVelocityLinearVelocity)
     if visionSensorAuxPackets:
         steerValue = visionSensorAuxPacketsToSteer(visionSensorAuxPackets)
         velocityAmount = visionSensorAuxPacketsToVelocity(visionSensorAuxPackets)
@@ -112,7 +112,7 @@ while (time.time() - t) < 600:
     # print("SENSOR VALUES = ", sensor_val)
     # print("sensor_sq[max_ind] = ", sensor_sq[max_ind])
     if sensor_sq[max_ind] > 0.8:
-        print("-----TURNING-----")
+        # print("-----TURNING-----")
         steer = -1 / sensor_loc[max_ind]
         forwardVelocity = 0 # set forward velocity to 0 so it rotates in place
     else:
@@ -121,12 +121,12 @@ while (time.time() - t) < 600:
         
     if abs(pioneerVelocityLinearVelocity[0]) < 0.001 and abs(pioneerVelocityLinearVelocity[1]) < 0.001:
         print("P3DX IS STUCK!")
-        forwardVelocity = -10
+        forwardVelocity = -10 # -10 gives a big enough push quick enough for P3DX to see the cube it got stuck on again to avoid it
         steer = -1 / sensor_loc[4]
     
     # print("SENSOR_LOC = ", sensor_loc[max_ind])
     # print("OBJ AVOID STEER = ", steer)
-    steeringGain = 0.5	#steering gain
+    steeringGain = 0.25	#steering gain
     leftMotorVelocity = forwardVelocity + steeringGain * steer
     rightMotorVelocity = forwardVelocity - steeringGain * steer
     print("V_l =", leftMotorVelocity)
