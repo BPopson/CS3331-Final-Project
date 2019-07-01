@@ -119,8 +119,13 @@ while (time.time() - t) < 600:
         steer = (steerValue if steerValue else 0)
         forwardVelocity = (velocityAmount if velocityAmount else 1)
         
-    print("SENSOR_LOC = ", sensor_loc[max_ind])
-    print("OBJ AVOID STEER = ", steer)
+    if abs(pioneerVelocityLinearVelocity[0]) < 0.001 and abs(pioneerVelocityLinearVelocity[1]) < 0.001:
+        print("P3DX IS STUCK!")
+        forwardVelocity = -10
+        steer = -1 / sensor_loc[4]
+    
+    # print("SENSOR_LOC = ", sensor_loc[max_ind])
+    # print("OBJ AVOID STEER = ", steer)
     steeringGain = 0.5	#steering gain
     leftMotorVelocity = forwardVelocity + steeringGain * steer
     rightMotorVelocity = forwardVelocity - steeringGain * steer
