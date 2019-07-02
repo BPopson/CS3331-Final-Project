@@ -20,34 +20,53 @@ vrep.simxFinish(-1) # just in case, close all opened connections
 
 clientID = vrep.simxStart('127.0.0.1', 19999, True, True, 5000, 5)
 
+def blobDetected(auxPackets):
+    return auxPackets[1][0] > 0
+
+def blobNoiseDetected(auxPackets):
+    return auxPackets[1][0] > 3
+
 # params: auxillaryPackets from simxReadVisionSensor function
 # returns: steer amount
 def visionSensorAuxPacketsToSteer(auxPackets):
-    blobCount = auxPackets[1][0]
-    # If we have more than 0 blobs then use that data
-    # If more than 2 blobs detected, throw out reading because it probably contains noise
-    if blobCount > 0 and blobCount < 3:
+    if blobNoiseDetected(auxPackets):
+        print("BLOB NOISE DETECTED!")
+        return 1
+    if blobDetected(auxPackets) and not blobNoiseDetected(auxPackets):
+        print("BLOB FOUND")
         xtarget = auxPackets[1][5]
+        error = 0.5-xtarget
+        steerWeight = 1
         print("x: ", xtarget)
-        if xtarget > 0.6:
-            return 1*(0.5-xtarget)
-        elif xtarget < 0.4:
-            return -1*(0.5-xtarget)
-        else:
-            return 0
+        print("error x:", error)
+        if abs(error) > 0.4:
+            print("STRAIGHT?")
+            steerWeight = 0
+        elif abs(error) < 0.25:
+            print("CORRECTABLE ERROR DETECTED")
+            steerWeight = -0.1 * error
+        elif abs(error) > 0.25:
+            print("LOW ERROR DETECTED")
+            steerWeight = -0.08 * error
+        return steerWeight
         
 
 # params: auxillaryPackets from simxReadVisionSensor function
 # returns: velocity multiplier
 def visionSensorAuxPacketsToVelocity(auxPackets):
-    blobCount = auxPackets[1][0]
-    # If we have more than 0 blobs then use that data
-    # If more than 2 blobs detected, throw out reading because it probably contains noise
-    if blobCount > 0 and blobCount < 3:
+    if blobDetected(auxPackets) and not blobNoiseDetected(auxPackets):
         ytarget = auxPackets[1][6]
-        print("y: ", ytarget)
-        return 1*(0.5-ytarget)
-        
+        xtarget = auxPackets[1][5]
+        xerror = 0.5-xtarget
+        velocity = 1
+        if abs(xerror) > 0.4:
+            velocity = 1
+        elif abs(xerror) < 0.25:
+            velocity = 1
+        elif abs(xerror) > 0.25:
+            velocity = 0.1
+        return velocity
+        # return velocity*abs(0.5-ytarget)
 
 if clientID != -1:  #check if client connection successful
     print('Connected to remote API server')
@@ -99,8 +118,8 @@ while (time.time() - t) < 600:
     if visionSensorAuxPackets:
         steerValue = visionSensorAuxPacketsToSteer(visionSensorAuxPackets)
         velocityAmount = visionSensorAuxPacketsToVelocity(visionSensorAuxPackets)
-        print("STEER VALUE = ", steerValue)
-        print("VELOCITY AMOUNT VALUE = ", velocityAmount)
+        #print("STEER VALUE = ", steerValue)
+        #print("VELOCITY AMOUNT VALUE = ", velocityAmount)
 
     #controller specific
     sensor_sq = sensor_val[0:8] * sensor_val[0:8] #square the values of front-facing sensors 1-8
@@ -115,22 +134,30 @@ while (time.time() - t) < 600:
         # print("-----TURNING-----")
         steer = -1 / sensor_loc[max_ind]
         forwardVelocity = 0 # set forward velocity to 0 so it rotates in place
+        steeringGain = 0.25
+    elif blobDetected(visionSensorAuxPackets):
+        steer = steerValue
+        forwardVelocity = velocityAmount
+        steeringGain = 1
     else:
-        steer = (steerValue if steerValue else 0)
-        forwardVelocity = (velocityAmount if velocityAmount else 1)
-        
+        steer = 0
+        forwardVelocity = 1
+        steeringGain = 0.15
+
     if abs(pioneerVelocityLinearVelocity[0]) < 0.001 and abs(pioneerVelocityLinearVelocity[1]) < 0.001:
         print("P3DX IS STUCK!")
         forwardVelocity = -10 # -10 gives a big enough push quick enough for P3DX to see the cube it got stuck on again to avoid it
         steer = -1 / sensor_loc[4]
+        steeringGain = 0.75
+
     
     # print("SENSOR_LOC = ", sensor_loc[max_ind])
     # print("OBJ AVOID STEER = ", steer)
-    steeringGain = 0.25	#steering gain
+    
     leftMotorVelocity = forwardVelocity + steeringGain * steer
     rightMotorVelocity = forwardVelocity - steeringGain * steer
-    print("V_l =", leftMotorVelocity)
-    print("V_r =", rightMotorVelocity)
+    #print("V_l =", leftMotorVelocity)
+    #print("V_r =", rightMotorVelocity)
 
     errorCode = vrep.simxSetJointTargetVelocity(clientID, left_motor_handle, leftMotorVelocity, vrep.simx_opmode_streaming)
     errorCode = vrep.simxSetJointTargetVelocity(clientID, right_motor_handle, rightMotorVelocity, vrep.simx_opmode_streaming) 
