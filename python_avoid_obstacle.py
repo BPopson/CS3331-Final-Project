@@ -31,23 +31,22 @@ def blobNoiseDetected(auxPackets):
 def visionSensorAuxPacketsToSteer(auxPackets):
     if blobNoiseDetected(auxPackets):
         print("BLOB NOISE DETECTED!")
-        return 1
+        return 0.25
     if blobDetected(auxPackets) and not blobNoiseDetected(auxPackets):
         print("BLOB FOUND")
-        xtarget = auxPackets[1][5]
+        xtarget = auxPackets[1][4]
+        ytarget = auxPackets[1][5]
         error = 0.5-xtarget
         steerWeight = 1
-        print("x: ", xtarget)
-        print("error x:", error)
-        if abs(error) > 0.4:
-            print("STRAIGHT?")
-            steerWeight = 0
-        elif abs(error) < 0.25:
-            print("CORRECTABLE ERROR DETECTED")
-            steerWeight = -0.1 * error
+        # print("x: ", xtarget)
+        # print("y: ", ytarget)
+        # print("error x:", error)
+        if abs(error) < 0.25:
+            print("ROUGHLY STRAIGHT")
+            steerWeight = -1 * error
         elif abs(error) > 0.25:
-            print("LOW ERROR DETECTED")
-            steerWeight = -0.08 * error
+            print("CORRECTABLE ERROR DETECTED")
+            steerWeight = -0.5 * error
         return steerWeight
         
 
@@ -55,18 +54,16 @@ def visionSensorAuxPacketsToSteer(auxPackets):
 # returns: velocity multiplier
 def visionSensorAuxPacketsToVelocity(auxPackets):
     if blobDetected(auxPackets) and not blobNoiseDetected(auxPackets):
-        ytarget = auxPackets[1][6]
-        xtarget = auxPackets[1][5]
+        xtarget = auxPackets[1][4]
+        ytarget = auxPackets[1][5]
         xerror = 0.5-xtarget
         velocity = 1
-        if abs(xerror) > 0.4:
-            velocity = 1
-        elif abs(xerror) < 0.25:
-            velocity = 1
+        if abs(xerror) < 0.25:
+            velocity = 0.5
         elif abs(xerror) > 0.25:
-            velocity = 0.1
-        return velocity
-        # return velocity*abs(0.5-ytarget)
+            velocity = 0.25
+        return velocity*(1/ytarget)
+    return 1
 
 if clientID != -1:  #check if client connection successful
     print('Connected to remote API server')
@@ -146,9 +143,9 @@ while (time.time() - t) < 600:
 
     if abs(pioneerVelocityLinearVelocity[0]) < 0.001 and abs(pioneerVelocityLinearVelocity[1]) < 0.001:
         print("P3DX IS STUCK!")
-        forwardVelocity = -10 # -10 gives a big enough push quick enough for P3DX to see the cube it got stuck on again to avoid it
+        forwardVelocity = -6
         steer = -1 / sensor_loc[4]
-        steeringGain = 0.75
+        steeringGain = 0.5
 
     
     # print("SENSOR_LOC = ", sensor_loc[max_ind])
@@ -156,8 +153,8 @@ while (time.time() - t) < 600:
     
     leftMotorVelocity = forwardVelocity + steeringGain * steer
     rightMotorVelocity = forwardVelocity - steeringGain * steer
-    #print("V_l =", leftMotorVelocity)
-    #print("V_r =", rightMotorVelocity)
+    print("V_l =", leftMotorVelocity)
+    print("V_r =", rightMotorVelocity)
 
     errorCode = vrep.simxSetJointTargetVelocity(clientID, left_motor_handle, leftMotorVelocity, vrep.simx_opmode_streaming)
     errorCode = vrep.simxSetJointTargetVelocity(clientID, right_motor_handle, rightMotorVelocity, vrep.simx_opmode_streaming) 
