@@ -1,6 +1,8 @@
 
 # CS3331-Final-Project
 
+This is a script that was written/modified for my Intro to Robotics final group project.
+
 Python script to interface with V-REP to move a Pioneer P3DX robot to see red objects and navigate to them.
 
 Created and tested on [V-REP PRO EDU](http://www.coppeliarobotics.com/) (Version 3.6.1)
